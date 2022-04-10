@@ -1,0 +1,44 @@
+<?xml version = "1.0" encoding = "UTF-8"?>
+<beans xmlns = "http://www.springframework.org/schema/beans"
+       xmlns:xsi = "http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation = "
+      http://www.springframework.org/schema/beans
+      http://www.springframework.org/schema/beans/spring-beans.xsd
+      http://camel.apache.org/schema/spring
+      http://camel.apache.org/schema/spring/camel-spring.xsd">
+    <bean name="lowerCaser" class="com.sbytestream.processors.LowerCaser"></bean>
+    <bean name="emailParser" class="com.sbytestream.processors.EmailParser"></bean>
+    <bean name="jsonConvertor" class="com.sbytestream.processors.JsonConvertor"></bean>
+    <bean name="spamIdentifier" class="com.sbytestream.processors.SpamIdentifier">
+        <property name="blockedSenders">
+            <list>
+                <value>manish@email.com</value>
+                <value>rajesh@email.com</value>
+            </list>
+        </property>
+    </bean>
+    <bean name="elasticsearch-rest" class="org.apache.camel.component.elasticsearch.ElasticsearchComponent">
+        <property name="hostAddresses" value="localhost:9200"></property>
+        <property name="user" value="elastic"></property>
+        <property name="password" value="********"></property>
+    </bean>
+
+    <camelContext xmlns = "http://camel.apache.org/schema/spring" id="camel">
+        <route>
+            <from uri="file://data/input" />
+            <process ref="emailParser" />
+            <process ref="spamIdentifier" />
+            <choice>
+                <when>
+                    <simple>${exchangeProperty.spam} == 'true'</simple>
+                    <to uri="file://data/spam" />
+                </when>
+                <otherwise>
+                    <process ref="jsonConvertor" />
+                    <to uri="file://data/output" />
+                    <to uri="elasticsearch-rest://elasticsearch?operation=INDEX&amp;indexName=mails" />
+                </otherwise>
+            </choice>
+        </route>
+    </camelContext>
+</beans>
